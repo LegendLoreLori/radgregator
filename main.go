@@ -1,14 +1,22 @@
 package main
 
 import (
+	"context"
+	"database/sql"
 	"errors"
 	"fmt"
+	"log"
 	"os"
+	"time"
 
 	"github.com/LegendLoreLori/radgregator/internal/config"
+	"github.com/LegendLoreLori/radgregator/internal/database"
+	"github.com/google/uuid"
+	_ "github.com/lib/pq"
 )
 
 type state struct {
+	db  *database.Queries
 	cfg *config.Config
 }
 
@@ -40,6 +48,9 @@ func handlerLogin(s *state, cmd command) error {
 	if len(cmd.args) < 2 {
 		return errors.New("missing positional argument [USERNAME]")
 	}
+	if _, err := s.db.GetUser(context.Background(), cmd.args[1]); err != nil {
+		return fmt.Errorf("no user %q registered", cmd.args[1])
+	}
 
 	if err := s.cfg.SetUser(cmd.args[1]); err != nil {
 		return fmt.Errorf("error calling config method SetUser: %w", err)
@@ -47,17 +58,49 @@ func handlerLogin(s *state, cmd command) error {
 	println("username set")
 	return nil
 }
+func handlerRegister(s *state, cmd command) error {
+	if len(cmd.args) < 2 {
+		return errors.New("missing positional argument [USERNAME]")
+	}
+
+	user, err := s.db.CreateUser(context.Background(), database.CreateUserParams{
+		ID:        uuid.New(),
+		CreatedAt: sql.NullTime{Time: time.Now(), Valid: true},
+		UpdatedAt: sql.NullTime{Time: time.Now(), Valid: true},
+		Name:      cmd.args[1],
+	})
+	if err != nil {
+		return err
+	}
+	fmt.Printf("User %s created.\n", user.Name)
+	log.Printf("user created: %v\n", user)
+	return nil
+}
 
 func main() {
+	f, err := os.OpenFile("db.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer f.Close() // unsure if this needs to be called but i'll put it here for now
+	log.SetOutput(f)
 	cfg, err := config.Read()
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
-	s := state{&cfg}
-	c := commands{make(map[string]func(*state, command) error)}
+	dbUrl := cfg.DbUrl
+	db, err := sql.Open("postgres", dbUrl)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	dbQueries := database.New(db)
 
+	s := state{dbQueries, &cfg}
+	c := commands{make(map[string]func(*state, command) error)}
 	c.register("login", handlerLogin)
+	c.register("register", handlerRegister)
 
 	if len(os.Args) < 2 {
 		fmt.Println("missing positional arguments, I'll implement a better way to handle this later")

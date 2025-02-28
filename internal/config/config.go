@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 )
 
 const (
@@ -24,7 +25,15 @@ func Read() (Config, error) {
 
 	configData, err := os.ReadFile(path)
 	if err != nil {
-		return cfg, fmt.Errorf("error reading file: %w", err)
+		if strings.Contains(err.Error(), "no such file or directory") {
+			write(Config{})
+			configData, err = os.ReadFile(path)
+			if err != nil {
+				return cfg, fmt.Errorf("error calling Config method write: %w", err)
+			}
+		} else {
+			return cfg, fmt.Errorf("error reading file: %w", err)
+		}
 	}
 
 	err = json.Unmarshal(configData, &cfg)
