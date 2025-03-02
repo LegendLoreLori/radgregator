@@ -72,8 +72,46 @@ func handlerRegister(s *state, cmd command) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("User %s created.\n", user.Name)
+	fmt.Printf("user %s created\n", user.Name)
 	log.Printf("user created: %v\n", user)
+	return nil
+}
+func handlerReset(s *state, _ command) error {
+	if err := s.db.ResetUsers(context.Background()); err != nil {
+		return err
+	}
+	println("all users deleted")
+	return nil
+}
+func handlerList(s *state, _ command) error {
+	users, err := s.db.GetUsers(context.Background())
+	if err != nil {
+		return err
+	}
+	if len(users) == 0 {
+		println("no users registered")
+		return nil
+	}
+
+	for i := 0; i < len(users); i++ {
+		if users[i].Name == s.cfg.CurrentUserName {
+			fmt.Printf(" * %s (current)\n", users[i].Name)
+			continue
+		}
+		fmt.Printf(" * %s\n", users[i].Name)
+	}
+	return nil
+}
+func handlerAggregate(s *state, cmd command) error {
+	if len(cmd.args) < 2 {
+		return errors.New("missing positional argument [FEED]")
+	}
+
+	rssFeed, err := fetchFeed(context.Background(), cmd.args[1])
+	if err != nil {
+		print(err)
+	}
+	fmt.Printf("%+v\n", *rssFeed)
 	return nil
 }
 
@@ -101,6 +139,9 @@ func main() {
 	c := commands{make(map[string]func(*state, command) error)}
 	c.register("login", handlerLogin)
 	c.register("register", handlerRegister)
+	c.register("reset", handlerReset)
+	c.register("list", handlerList)
+	c.register("agg", handlerAggregate)
 
 	if len(os.Args) < 2 {
 		fmt.Println("missing positional arguments, I'll implement a better way to handle this later")
