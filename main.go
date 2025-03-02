@@ -87,10 +87,8 @@ func handlerList(s *state, _ command) error {
 	users, err := s.db.GetUsers(context.Background())
 	if err != nil {
 		return err
-	}
-	if len(users) == 0 {
-		println("no users registered")
-		return nil
+	} else if len(users) == 0 {
+		return errors.New("no users registered")
 	}
 
 	for i := 0; i < len(users); i++ {
@@ -139,13 +137,36 @@ func handlerAddFeed(s *state, cmd command) error {
 	fmt.Printf("added feed %q %s\n", feed.Name, feed.Url)
 	return nil
 }
+func handlerFeeds(s *state, _ command) error {
+	userNames := make(map[uuid.UUID]string)
+	users, err := s.db.GetUsers(context.Background())
+	if err != nil {
+		return err
+	} else if len(users) == 0 {
+		return errors.New("no users registered")
+	}
+	for i := 0; i < len(users); i++ {
+		userNames[users[i].ID] = users[i].Name
+	}
+
+	feeds, err := s.db.GetFeeds(context.Background())
+	if err != nil {
+		return err
+	}
+
+	for i := 0; i < len(feeds); i++ {
+		fmt.Printf(" * %s %q %s\n", feeds[i].Name, feeds[i].Url, userNames[feeds[i].UserID])
+	}
+
+	return nil
+}
 
 func main() {
 	f, err := os.OpenFile("db.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer f.Close() // unsure if this needs to be called but i'll put it here for now
+	defer f.Close() // unsure if this needs to be called but i'll put it here for now (maybe one day i'll find out)
 	log.SetOutput(f)
 	cfg, err := config.Read()
 	if err != nil {
@@ -168,6 +189,7 @@ func main() {
 	c.register("list", handlerList)
 	c.register("agg", handlerAggregate)
 	c.register("add-feed", handlerAddFeed)
+	c.register("feeds", handlerFeeds)
 
 	if len(os.Args) < 2 {
 		fmt.Println("missing command name\n usage: radgregate COMMAND [...ARGS]")
