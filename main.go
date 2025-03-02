@@ -138,18 +138,7 @@ func handlerAddFeed(s *state, cmd command) error {
 	return nil
 }
 func handlerFeeds(s *state, _ command) error {
-	userNames := make(map[uuid.UUID]string)
-	users, err := s.db.GetUsers(context.Background())
-	if err != nil {
-		return err
-	} else if len(users) == 0 {
-		return errors.New("no users registered")
-	}
-	for i := 0; i < len(users); i++ {
-		userNames[users[i].ID] = users[i].Name
-	}
-
-	feeds, err := s.db.GetFeeds(context.Background())
+	feeds, err := s.db.GetFeedsUsers(context.Background())
 	if err != nil {
 		return err
 	} else if len(feeds) == 0 {
@@ -157,7 +146,7 @@ func handlerFeeds(s *state, _ command) error {
 	}
 
 	for i := 0; i < len(feeds); i++ {
-		fmt.Printf(" * %s - %q - %s\n", feeds[i].Name, feeds[i].Url, userNames[feeds[i].UserID])
+		fmt.Printf(" * %s - %q - %s\n", feeds[i].Name, feeds[i].Url, feeds[i].UserName.String)
 	}
 
 	return nil
