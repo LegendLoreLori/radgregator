@@ -65,8 +65,8 @@ func handlerRegister(s *state, cmd command) error {
 
 	user, err := s.db.CreateUser(context.Background(), database.CreateUserParams{
 		ID:        uuid.New(),
-		CreatedAt: sql.NullTime{Time: time.Now(), Valid: true},
-		UpdatedAt: sql.NullTime{Time: time.Now(), Valid: true},
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
 		Name:      cmd.args[1],
 	})
 	if err != nil {
@@ -124,8 +124,8 @@ func handlerAddFeed(s *state, cmd command) error {
 
 	feed, err := s.db.CreateFeed(context.Background(), database.CreateFeedParams{
 		ID:        uuid.New(),
-		CreatedAt: sql.NullTime{Time: time.Now(), Valid: true},
-		UpdatedAt: sql.NullTime{Time: time.Now(), Valid: true},
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
 		Name:      cmd.args[1],
 		Url:       cmd.args[2],
 		UserID:    user.ID,

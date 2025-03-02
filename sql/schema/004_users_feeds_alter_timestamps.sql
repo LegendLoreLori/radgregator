@@ -1,0 +1,25 @@
+-- +goose Up
+ALTER TABLE users
+ALTER COLUMN created_at SET NOT NULL;
+
+ALTER TABLE users
+ALTER COLUMN updated_at SET NOT NULL;
+
+ALTER TABLE feeds
+ALTER COLUMN created_at SET NOT NULL;
+
+ALTER TABLE feeds
+ALTER COLUMN updated_at SET NOT NULL;
+
+-- +goose Down
+ALTER TABLE users
+ALTER COLUMN created_at DROP NOT NULL;
+
+ALTER TABLE users
+ALTER COLUMN updated_at DROP NOT NULL;
+
+ALTER TABLE feeds
+ALTER COLUMN created_at DROP NOT NULL;
+
+ALTER TABLE feeds
+ALTER COLUMN updated_at DROP NOT NULL;
