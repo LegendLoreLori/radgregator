@@ -114,6 +114,31 @@ func handlerAggregate(s *state, cmd command) error {
 	fmt.Printf("%+v\n", *rssFeed)
 	return nil
 }
+func handlerAddFeed(s *state, cmd command) error {
+	if len(cmd.args) < 3 {
+		return errors.New("missing positional arguments [NAME] [URL]")
+	}
+
+	user, err := s.db.GetUser(context.Background(), s.cfg.CurrentUserName)
+	if err != nil {
+		return err
+	}
+
+	feed, err := s.db.CreateFeed(context.Background(), database.CreateFeedParams{
+		ID:        uuid.New(),
+		CreatedAt: sql.NullTime{Time: time.Now(), Valid: true},
+		UpdatedAt: sql.NullTime{Time: time.Now(), Valid: true},
+		Name:      cmd.args[1],
+		Url:       cmd.args[2],
+		UserID:    user.ID,
+	})
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("added feed %q %s\n", feed.Name, feed.Url)
+	return nil
+}
 
 func main() {
 	f, err := os.OpenFile("db.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
@@ -142,9 +167,10 @@ func main() {
 	c.register("reset", handlerReset)
 	c.register("list", handlerList)
 	c.register("agg", handlerAggregate)
+	c.register("add-feed", handlerAddFeed)
 
 	if len(os.Args) < 2 {
-		fmt.Println("missing positional arguments, I'll implement a better way to handle this later")
+		fmt.Println("missing command name\n usage: radgregate COMMAND [...ARGS]")
 		os.Exit(1)
 	}
 	cmd := command{os.Args[1], os.Args[1:]}
