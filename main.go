@@ -152,10 +152,12 @@ func handlerFeeds(s *state, _ command) error {
 	feeds, err := s.db.GetFeeds(context.Background())
 	if err != nil {
 		return err
+	} else if len(feeds) == 0 {
+		return errors.New("no feeds created")
 	}
 
 	for i := 0; i < len(feeds); i++ {
-		fmt.Printf(" * %s %q %s\n", feeds[i].Name, feeds[i].Url, userNames[feeds[i].UserID])
+		fmt.Printf(" * %s - %q - %s\n", feeds[i].Name, feeds[i].Url, userNames[feeds[i].UserID])
 	}
 
 	return nil
