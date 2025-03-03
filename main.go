@@ -112,15 +112,21 @@ func handlerList(s *state, _ command) error {
 }
 func handlerAggregate(s *state, cmd command) error {
 	if len(cmd.args) < 2 {
-		return errors.New("missing positional argument [FEED]")
+		return errors.New("missing positional argument [INTERVAL]")
+	}
+	interval, err := time.ParseDuration(cmd.args[1])
+	if err != nil {
+		return err
+	}
+	if interval < 5*time.Second {
+		return errors.New("input an interval greater than 5 seconds")
 	}
 
-	rssFeed, err := fetchFeed(context.Background(), cmd.args[1])
-	if err != nil {
-		print(err)
+	fmt.Printf("begin collecting feeds every %s\n", interval)
+	ticker := time.NewTicker(interval)
+	for ; ; <-ticker.C {
+		scrapeFeeds(context.Background(), s)
 	}
-	fmt.Printf("%+v\n", *rssFeed)
-	return nil
 }
 func handlerFeeds(s *state, _ command) error {
 	feeds, err := s.db.GetFeedsUsers(context.Background())
@@ -133,6 +139,20 @@ func handlerFeeds(s *state, _ command) error {
 	for i := 0; i < len(feeds); i++ {
 		fmt.Printf(" * %s - %q - %s\n", feeds[i].Name, feeds[i].Url, feeds[i].UserName.String)
 	}
+
+	return nil
+}
+func handlerKillFeed(s *state, cmd command) error {
+	if len(cmd.args) < 2 {
+		return errors.New("missing positional arguments [URL]")
+	}
+
+	feed, err := s.db.DeleteFeed(context.Background(), cmd.args[1])
+	if err != nil {
+		return nil
+	}
+
+	fmt.Printf("deleted feed: %q - %s\n", feed.Name, feed.Url)
 
 	return nil
 }
@@ -200,6 +220,7 @@ func handlerFollowing(s *state, _ command, user database.User) error {
 	}
 	fmt.Printf("all feeds %s is following:\n", user.Name)
 	if len(following) == 0 {
+		fmt.Printf("%+v", following)
 		println(" * none!")
 	}
 	for i := 0; i < len(following); i++ {
@@ -254,6 +275,7 @@ func main() {
 	c.register("list", handlerList)
 	c.register("agg", handlerAggregate)
 	c.register("add-feed", middlewareLoggedIn(handlerAddFeed))
+	c.register("kill-feed", handlerKillFeed)
 	c.register("feeds", handlerFeeds)
 	c.register("follow", middlewareLoggedIn(handlerFollow))
 	c.register("following", middlewareLoggedIn(handlerFollowing))

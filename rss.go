@@ -3,9 +3,13 @@ package main
 import (
 	"context"
 	"encoding/xml"
+	"fmt"
 	"html"
 	"io"
 	"net/http"
+	"time"
+
+	"github.com/LegendLoreLori/radgregator/internal/database"
 )
 
 type RSSFeed struct {
@@ -53,4 +57,30 @@ func fetchFeed(ctx context.Context, feedUrl string) (*RSSFeed, error) {
 	}
 
 	return &feed, nil
+}
+
+func scrapeFeeds(ctx context.Context, s *state) error {
+	feedDetails, err := s.db.GetNextFeedToFetch(ctx)
+	if err != nil {
+		return err
+	}
+	err = s.db.MarkFeedFetched(ctx, database.MarkFeedFetchedParams{
+		UpdatedAt: time.Now(),
+		ID:        feedDetails.ID,
+	})
+	if err != nil {
+		return err
+	}
+
+	feed, err := fetchFeed(ctx, feedDetails.Url)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf(" * %s\n", feed.Channel.Title)
+	for _, post := range feed.Channel.Item {
+		println(post.Title)
+	}
+
+	return nil
 }
