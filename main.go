@@ -122,6 +122,21 @@ func handlerAggregate(s *state, cmd command) error {
 	fmt.Printf("%+v\n", *rssFeed)
 	return nil
 }
+func handlerFeeds(s *state, _ command) error {
+	feeds, err := s.db.GetFeedsUsers(context.Background())
+	if err != nil {
+		return err
+	} else if len(feeds) == 0 {
+		return errors.New("no feeds created")
+	}
+
+	for i := 0; i < len(feeds); i++ {
+		fmt.Printf(" * %s - %q - %s\n", feeds[i].Name, feeds[i].Url, feeds[i].UserName.String)
+	}
+
+	return nil
+}
+
 func handlerAddFeed(s *state, cmd command, user database.User) error {
 	if len(cmd.args) < 3 {
 		return errors.New("missing positional arguments [NAME] [URL]")
@@ -151,20 +166,6 @@ func handlerAddFeed(s *state, cmd command, user database.User) error {
 
 	fmt.Printf("added feed %q %s\n", feed.Name, feed.Url)
 	log.Printf("feed created: %+v\n", feed)
-	return nil
-}
-func handlerFeeds(s *state, _ command) error {
-	feeds, err := s.db.GetFeedsUsers(context.Background())
-	if err != nil {
-		return err
-	} else if len(feeds) == 0 {
-		return errors.New("no feeds created")
-	}
-
-	for i := 0; i < len(feeds); i++ {
-		fmt.Printf(" * %s - %q - %s\n", feeds[i].Name, feeds[i].Url, feeds[i].UserName.String)
-	}
-
 	return nil
 }
 func handlerFollow(s *state, cmd command, user database.User) error {
@@ -197,10 +198,30 @@ func handlerFollowing(s *state, _ command, user database.User) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("all feeds user: %s is following:\n", following[0].UserName)
+	fmt.Printf("all feeds %s is following:\n", user.Name)
+	if len(following) == 0 {
+		println(" * none!")
+	}
 	for i := 0; i < len(following); i++ {
 		fmt.Printf(" * %q\n", following[i].FeedName)
 	}
+
+	return nil
+}
+func handlerUnfollow(s *state, cmd command, user database.User) error {
+	if len(cmd.args) < 2 {
+		return errors.New("missing positional argument [URL]")
+	}
+	deleted, err := s.db.DeleteFeedFollow(context.Background(), database.DeleteFeedFollowParams{
+		UserID: user.ID,
+		Url:    cmd.args[1],
+	})
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("unfollowed: %q", cmd.args[1])
+	log.Printf("feed_follow deleted: %+v", deleted)
 
 	return nil
 }
@@ -236,6 +257,7 @@ func main() {
 	c.register("feeds", handlerFeeds)
 	c.register("follow", middlewareLoggedIn(handlerFollow))
 	c.register("following", middlewareLoggedIn(handlerFollowing))
+	c.register("unfollow", middlewareLoggedIn(handlerUnfollow))
 
 	if len(os.Args) < 2 {
 		fmt.Println("missing command name\n usage: radgregate COMMAND [...ARGS]")
