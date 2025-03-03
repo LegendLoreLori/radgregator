@@ -44,6 +44,16 @@ func (c *commands) run(s *state, cmd command) error {
 	return nil
 }
 
+func middlewareLoggedIn(handler func(s *state, cmd command, user database.User) error) func(*state, command) error {
+	return func(s *state, cmd command) error {
+		user, err := s.db.GetUser(context.Background(), s.cfg.CurrentUserName)
+		if err != nil {
+			return err
+		}
+		return handler(s, cmd, user)
+	}
+}
+
 func handlerLogin(s *state, cmd command) error {
 	if len(cmd.args) < 2 {
 		return errors.New("missing positional argument [USERNAME]")
@@ -112,14 +122,9 @@ func handlerAggregate(s *state, cmd command) error {
 	fmt.Printf("%+v\n", *rssFeed)
 	return nil
 }
-func handlerAddFeed(s *state, cmd command) error {
+func handlerAddFeed(s *state, cmd command, user database.User) error {
 	if len(cmd.args) < 3 {
 		return errors.New("missing positional arguments [NAME] [URL]")
-	}
-
-	user, err := s.db.GetUser(context.Background(), s.cfg.CurrentUserName)
-	if err != nil {
-		return err
 	}
 
 	feed, err := s.db.CreateFeed(context.Background(), database.CreateFeedParams{
@@ -162,7 +167,7 @@ func handlerFeeds(s *state, _ command) error {
 
 	return nil
 }
-func handlerFollow(s *state, cmd command) error {
+func handlerFollow(s *state, cmd command, user database.User) error {
 	if len(cmd.args) < 2 {
 		return errors.New("missing positional argument [URL]")
 	}
@@ -171,11 +176,6 @@ func handlerFollow(s *state, cmd command) error {
 	if err != nil {
 		return err
 	}
-	user, err := s.db.GetUser(context.Background(), s.cfg.CurrentUserName)
-	if err != nil {
-		return err
-	}
-
 	feedFollow, err := s.db.CreateFeedFollow(context.Background(), database.CreateFeedFollowParams{
 		ID:        uuid.New(),
 		CreatedAt: time.Now(),
@@ -192,8 +192,8 @@ func handlerFollow(s *state, cmd command) error {
 	log.Printf("feed_follow created: %+v\n", feedFollow)
 	return nil
 }
-func handlerFollowing(s *state, _ command) error {
-	following, err := s.db.GetFeedFollowsForUser(context.Background(), s.cfg.CurrentUserName)
+func handlerFollowing(s *state, _ command, user database.User) error {
+	following, err := s.db.GetFeedFollowsForUser(context.Background(), user.Name)
 	if err != nil {
 		return err
 	}
@@ -232,10 +232,10 @@ func main() {
 	c.register("reset", handlerReset)
 	c.register("list", handlerList)
 	c.register("agg", handlerAggregate)
-	c.register("add-feed", handlerAddFeed)
+	c.register("add-feed", middlewareLoggedIn(handlerAddFeed))
 	c.register("feeds", handlerFeeds)
-	c.register("follow", handlerFollow)
-	c.register("following", handlerFollowing)
+	c.register("follow", middlewareLoggedIn(handlerFollow))
+	c.register("following", middlewareLoggedIn(handlerFollowing))
 
 	if len(os.Args) < 2 {
 		fmt.Println("missing command name\n usage: radgregate COMMAND [...ARGS]")
