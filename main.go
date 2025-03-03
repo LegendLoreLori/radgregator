@@ -73,7 +73,7 @@ func handlerRegister(s *state, cmd command) error {
 		return err
 	}
 	fmt.Printf("user %s created\n", user.Name)
-	log.Printf("user created: %v\n", user)
+	log.Printf("user created: %+v\n", user)
 	return nil
 }
 func handlerReset(s *state, _ command) error {
@@ -133,8 +133,19 @@ func handlerAddFeed(s *state, cmd command) error {
 	if err != nil {
 		return err
 	}
+	_, err = s.db.CreateFeedFollow(context.Background(), database.CreateFeedFollowParams{
+		ID:        uuid.New(),
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+		UserID:    user.ID,
+		FeedID:    feed.ID,
+	})
+	if err != nil {
+		return err
+	}
 
 	fmt.Printf("added feed %q %s\n", feed.Name, feed.Url)
+	log.Printf("feed created: %+v\n", feed)
 	return nil
 }
 func handlerFeeds(s *state, _ command) error {
@@ -147,6 +158,48 @@ func handlerFeeds(s *state, _ command) error {
 
 	for i := 0; i < len(feeds); i++ {
 		fmt.Printf(" * %s - %q - %s\n", feeds[i].Name, feeds[i].Url, feeds[i].UserName.String)
+	}
+
+	return nil
+}
+func handlerFollow(s *state, cmd command) error {
+	if len(cmd.args) < 2 {
+		return errors.New("missing positional argument [URL]")
+	}
+
+	feed, err := s.db.GetFeed(context.Background(), cmd.args[1])
+	if err != nil {
+		return err
+	}
+	user, err := s.db.GetUser(context.Background(), s.cfg.CurrentUserName)
+	if err != nil {
+		return err
+	}
+
+	feedFollow, err := s.db.CreateFeedFollow(context.Background(), database.CreateFeedFollowParams{
+		ID:        uuid.New(),
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+		UserID:    user.ID,
+		FeedID:    feed.ID,
+	})
+	if err != nil {
+		return err
+	}
+
+	// I feel like i've missed the point here but oh well
+	fmt.Printf("user: %s now following %q\n", feedFollow.UserName, feedFollow.FeedName)
+	log.Printf("feed_follow created: %+v\n", feedFollow)
+	return nil
+}
+func handlerFollowing(s *state, _ command) error {
+	following, err := s.db.GetFeedFollowsForUser(context.Background(), s.cfg.CurrentUserName)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("all feeds user: %s is following:\n", following[0].UserName)
+	for i := 0; i < len(following); i++ {
+		fmt.Printf(" * %q\n", following[i].FeedName)
 	}
 
 	return nil
@@ -181,6 +234,8 @@ func main() {
 	c.register("agg", handlerAggregate)
 	c.register("add-feed", handlerAddFeed)
 	c.register("feeds", handlerFeeds)
+	c.register("follow", handlerFollow)
+	c.register("following", handlerFollowing)
 
 	if len(os.Args) < 2 {
 		fmt.Println("missing command name\n usage: radgregate COMMAND [...ARGS]")
