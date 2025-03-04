@@ -71,7 +71,7 @@ ON posts.feed_id = feed_follows.feed_id
 INNER JOIN feeds
 ON posts.feed_id = feeds.id
 WHERE feed_follows.user_id = $1
-ORDER BY posts.updated_at DESC
+ORDER BY posts.updated_at ASC
 LIMIT $2
 `
 

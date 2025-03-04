@@ -33,7 +33,7 @@ type RSSItem struct {
 	PubDate     string `xml:"pubDate"`
 }
 
-var commonDateLayouts = []string{time.RFC1123, time.RFC1123Z, time.RFC3339}
+var commonDateLayouts = []string{time.RFC1123, time.RFC1123Z, time.RFC3339, time.RFC3339Nano, time.RFC822, time.RFC822Z, time.RFC850}
 
 func fetchFeed(ctx context.Context, feedUrl string) (*RSSFeed, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", feedUrl, nil)
