@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/LegendLoreLori/radgregator/internal/config"
@@ -246,6 +247,37 @@ func handlerUnfollow(s *state, cmd command, user database.User) error {
 
 	return nil
 }
+func handlerBrowse(s *state, cmd command, user database.User) error {
+	var limit int
+	if len(cmd.args) < 2 {
+		limit = 2
+	} else {
+		var err error
+		limit, err = strconv.Atoi(cmd.args[1])
+		if err != nil {
+			return err
+		}
+	}
+
+	posts, err := s.db.GetPostsForUser(context.Background(), database.GetPostsForUserParams{
+		UserID: user.ID,
+		Limit:  int32(limit),
+	})
+	if err != nil {
+		return err
+	}
+
+	for _, post := range posts {
+		fmt.Printf("\n * %s\n", post.FeedName)
+		fmt.Printf("%s - %s\n", post.Title.String, post.Url)
+		println(post.Description.String)
+		if post.PublishedAt.Valid {
+			fmt.Printf("%s\n", post.PublishedAt.Time)
+		}
+	}
+
+	return nil
+}
 
 func main() {
 	f, err := os.OpenFile("db.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
@@ -280,6 +312,7 @@ func main() {
 	c.register("follow", middlewareLoggedIn(handlerFollow))
 	c.register("following", middlewareLoggedIn(handlerFollowing))
 	c.register("unfollow", middlewareLoggedIn(handlerUnfollow))
+	c.register("browse", middlewareLoggedIn(handlerBrowse))
 
 	if len(os.Args) < 2 {
 		fmt.Println("missing command name\n usage: radgregate COMMAND [...ARGS]")

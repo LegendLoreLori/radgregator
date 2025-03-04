@@ -65,14 +65,18 @@ func (q *Queries) CreatePost(ctx context.Context, arg CreatePostParams) (Post, e
 }
 
 const getPostsForUser = `-- name: GetPostsForUser :many
-SELECT posts.title, posts.url, posts.description, posts.published_at, feeds.name FROM posts
+SELECT posts.title, posts.url, posts.description, posts.published_at, feeds.name as feed_name FROM posts
+INNER JOIN feed_follows
+ON posts.feed_id = feed_follows.feed_id
 INNER JOIN feeds
-ON posts.feed_id = $1
+ON posts.feed_id = feeds.id
+WHERE feed_follows.user_id = $1
+ORDER BY posts.updated_at DESC
 LIMIT $2
 `
 
 type GetPostsForUserParams struct {
-	FeedID uuid.UUID
+	UserID uuid.UUID
 	Limit  int32
 }
 
@@ -81,11 +85,11 @@ type GetPostsForUserRow struct {
 	Url         string
 	Description sql.NullString
 	PublishedAt sql.NullTime
-	Name        string
+	FeedName    string
 }
 
 func (q *Queries) GetPostsForUser(ctx context.Context, arg GetPostsForUserParams) ([]GetPostsForUserRow, error) {
-	rows, err := q.db.QueryContext(ctx, getPostsForUser, arg.FeedID, arg.Limit)
+	rows, err := q.db.QueryContext(ctx, getPostsForUser, arg.UserID, arg.Limit)
 	if err != nil {
 		return nil, err
 	}
@@ -98,7 +102,7 @@ func (q *Queries) GetPostsForUser(ctx context.Context, arg GetPostsForUserParams
 			&i.Url,
 			&i.Description,
 			&i.PublishedAt,
-			&i.Name,
+			&i.FeedName,
 		); err != nil {
 			return nil, err
 		}
