@@ -2,14 +2,19 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"html"
 	"io"
+	"log"
 	"net/http"
 	"time"
 
 	"github.com/LegendLoreLori/radgregator/internal/database"
+	"github.com/google/uuid"
+	"github.com/lib/pq"
 )
 
 type RSSFeed struct {
@@ -27,6 +32,8 @@ type RSSItem struct {
 	Description string `xml:"description"`
 	PubDate     string `xml:"pubDate"`
 }
+
+var commonDateLayouts = []string{time.RFC1123, time.RFC1123Z, time.RFC3339}
 
 func fetchFeed(ctx context.Context, feedUrl string) (*RSSFeed, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", feedUrl, nil)
@@ -77,10 +84,53 @@ func scrapeFeeds(ctx context.Context, s *state) error {
 		return err
 	}
 
-	fmt.Printf(" * %s\n", feed.Channel.Title)
+	fmt.Printf("saving posts for %s...", feed.Channel.Title)
 	for _, post := range feed.Channel.Item {
-		println(post.Title)
-	}
+		pubDate := sql.NullTime{}
+		title := sql.NullString{}
+		description := sql.NullString{}
 
+		for _, format := range commonDateLayouts {
+			t, err := time.Parse(format, post.PubDate)
+			if err != nil {
+				continue
+			}
+			pubDate = sql.NullTime{
+				Time:  t,
+				Valid: true,
+			}
+		}
+		if len(post.Title) != 0 {
+			title = sql.NullString{
+				String: post.Title,
+				Valid:  true,
+			}
+		}
+		if len(post.Description) != 0 {
+			title = sql.NullString{
+				String: post.Description,
+				Valid:  true,
+			}
+		}
+
+		_, err = s.db.CreatePost(ctx, database.CreatePostParams{
+			ID:          uuid.New(),
+			CreatedAt:   time.Now(),
+			UpdatedAt:   time.Now(),
+			Title:       title,
+			Url:         post.Link,
+			Description: description,
+			PublishedAt: pubDate,
+			FeedID:      feedDetails.ID,
+		})
+		var sqlErr *pq.Error
+		if errors.As(err, &sqlErr) {
+			if sqlErr.Code == "23505" { // duplicate key entry
+				continue
+			}
+			log.Print(err)
+		}
+	}
+	println("done")
 	return nil
 }
